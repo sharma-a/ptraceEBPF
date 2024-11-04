@@ -12,8 +12,6 @@
 
 FILE* file;
 void trace(pid_t);
-int handleSysCall(pid_t, long);
-
 
 void copyFile(char *in, char *out)
 {
@@ -57,13 +55,8 @@ void readString(pid_t target, long* addr, char* str){
             addr++;
 
         }
-        if(i==0 || str[i-1]!=0) printf("%d\n",i); 
-
+        //if(i==0 || str[i-1]!=0) printf("%d\n",i); 
 }
-
-
-
-
 
 int main(int argc, char *argv[]) {
     pid_t target = vfork();
@@ -76,20 +69,13 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-
-
-
-
 void trace(pid_t target){
-    //printf("tracing %d\n",target);
     int status;
     struct user_regs_struct regs;
     long syscall;
     char filename[20];
-    sprintf(filename,"%d.log",target);
-    file=fopen(filename,"w");
-    //printf("Orig %d : %s\n",getpid(),filename);
-    //file=stdout;
+    //sprintf(filename,"%d.log",target);
+    //file=fopen(filename,"w");
 
     ptrace(PTRACE_ATTACH,target,NULL,NULL); //initial attach
     waitpid(target,&status,0);
@@ -97,8 +83,6 @@ void trace(pid_t target){
 
     char tmpFl[20]="/tmp/sfx_XXXXXX";
     int fd=mkstemp(tmpFl);
-    //fclose(fd);
-
 
     while(1){
         //currently tracee is blocked
@@ -143,10 +127,10 @@ void trace(pid_t target){
             else{
                 //newtracer
                 //do i need to detach the old one. i think not
-                sprintf(filename,"%d.log",newPid);
+                //sprintf(filename,"%d.log",newPid);
                 //printf("New %d : %s\n",getpid(),filename);
-                fclose(file);
-                file=fopen(filename,"w");
+                //fclose(file);
+                //file=fopen(filename,"w");
                 target=newPid;
                 ptrace(PTRACE_ATTACH,newPid,NULL,NULL);
                 waitpid(newPid,&status,0);
@@ -164,7 +148,6 @@ void trace(pid_t target){
             fl=(unsigned int)(syscall==__NR_openat?(regs.rdx):(regs.rsi));
             readString(target, p, pathname);
 
-           
             //disallow attempts to open a forbidden file from reading
             if(((fl&O_ACCMODE)==O_RDONLY || (fl&O_ACCMODE)==O_RDWR)
                 && (!checkPath(pathname))
@@ -183,11 +166,12 @@ void trace(pid_t target){
                     || (fl&O_ACCMODE)==O_RDWR){
                 //if the original file doesn't exist proceed as usual
                 //else let the new tmp be created
-                fprintf(stderr,"%s:%d\n",pathname,access(pathname,F_OK));
+                //fprintf(stderr,"%s:%d\n",pathname,access(pathname,F_OK));
                 if(access(pathname,F_OK)==0){
+                    //a tmpFile for each write?
                     //1) get a new filename
-                    //char tmpFl[20]="/tmp/sfx_XXXXXX";
-                    //int fd=mkstemp(tmpFl);
+                    char tmpFl[20]="/tmp/sfx_XXXXXX";
+                    int fd=mkstemp(tmpFl);
                     //2) copy the original file to this new filename
                     copyFile(pathname,tmpFl);
                     //3) POKE the newfile name at the appropriate location
@@ -203,77 +187,20 @@ void trace(pid_t target){
                     for(int i=0;i<8;i++)
                         w[1]+=(((long)tmpFl[i+8]) << (i*8));
                     ptrace(PTRACE_POKEDATA,target,p+1,w[1]);
-                }
-                ptrace(PTRACE_SYSCALL,target,NULL,NULL);
-                waitpid(target,&status,0);
-                continue;  
-            }
-            //ptrace(PTRACE_SYSCALL,target,NULL,NULL);
-            //waitpid(target,&status,0);
-            //if(WIFEXITED(status)) {break;}    //just in case
-        }
-        if(        syscall==__NR_rename 
-                || syscall==__NR_renameat
-                || syscall==__NR_renameat2){
-            //change the rename destination to a temporary file
-            //only if the destination path doesnt already exist
-            fprintf(stderr,"yes ");
-            char pathname[800];
-            long* p;
-            p=syscall==__NR_rename?(long*)(regs.rsi):(long*)(regs.r10);
-            readString(target, p, pathname);
-            fprintf(stderr,"%s\n",pathname);
-            if(access(pathname,F_OK)==0){
-                //destination path exists
-                //redirect it
-                //1) get a new filename
-                char tmpFl[20]="/tmp/sfx_XXXXXX";
-                int fd=mkstemp(tmpFl);
-                //2) POKE the newfile name at the appropriate location
-                long *p;
-                p=syscall==__NR_openat?(long*)(regs.rsi):(long*)(regs.rdi);
-                long w[2]={0,0};
-                for(int i=0;i<8;i++)
-                    w[0]+=(((long)tmpFl[i]) << (i*8));
-                ptrace(PTRACE_POKEDATA,target,p,w[0]);
-                for(int i=0;i<8;i++)
-                    w[1]+=(((long)tmpFl[i+8]) << (i*8));
-                ptrace(PTRACE_POKEDATA,target,p+1,w[1]);
-            }
-            ptrace(PTRACE_SYSCALL,target,NULL,NULL);
-            waitpid(target,&status,0);
-            continue;  
-        }
-
+               }
+               ptrace(PTRACE_SYSCALL,target,NULL,NULL);
+               waitpid(target,&status,0);
+               continue;  
+ 
+           }
+       }
         //other syscalls let them continue
         ptrace(PTRACE_SYSCALL,target,NULL,NULL);
         waitpid(target,&status,0);
-        if(WIFEXITED(status)) {break;}    //just in case
+        if(WIFEXITED(status)) {break;}
     }
-    fclose(file);
+    //fclose(file);
 
 }
 
-int handleSysCall(pid_t target, long syscall){
 
-        //starting the syscall
-        //Do whatever is to be done at the start of the call
-        //the tracee is stopped now
-        //
-        //printf("handling %ld\n",syscall);
-        int status;
-        fprintf(file,"Started: %ld\n",syscall);
-        ptrace(PTRACE_SYSCALL,target,NULL,NULL);//let the syscall run till it is done
-                                                // wait for the syscall to finish
-
-
-        waitpid(target,&status,0);
-        if(WIFEXITED(status)) {return -1;}    //just in case
-        //ending the syscall 
-        //Do whatever is to be done at the start of the call
-        //the tracee is stopped now
-        //
-        fprintf(file,"Ended: %ld\n\n",syscall);
-        return 0; 
-        //note the tracee has finished the syscall and is stopped now 
-}

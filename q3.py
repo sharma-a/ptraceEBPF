@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 from bcc import BPF
-import psutil
+#import psutil
 from datetime import datetime
 import ipaddress
 
@@ -63,7 +63,7 @@ LSM_PROBE(inode_create, struct inode *dir, struct dentry *dentry,
         bpf_probe_read_kernel_str(x, 20, dentry->d_name.name);
         struct data_t data={};
         data.syscall=2;// 1 for open
-        data.ip=-1
+        data.ip=-1;
         data.pid = bpf_get_current_pid_tgid() >> 32;
         data.uid = bpf_get_current_uid_gid() & 0xFFFFFFFF;
         data.par_inode=dir->i_ino;
@@ -113,7 +113,8 @@ LSM_PROBE(bprm_check_security, struct linux_binprm *bprm)
 
 
 
-bootTime=int(psutil.boot_time())
+#bootTime=int(psutil.boot_time())
+bootTime=12345544
 b = BPF(text=source)
 def printEvent(cpu, data, size):
      data=b["output"].event(data)
