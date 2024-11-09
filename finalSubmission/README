@@ -1,0 +1,20 @@
+Q2)
+I did the secfile part for this question.
+to compile do gcc -o secfile secfile.c
+to run do ./secfile password command args
+password is a string 
+I did it using PTRACE_TRACEME and hence it works without needing sudo.
+Forks cant be handled properly using TRACEME option so I did not do that.
+I tried doing the forks using the PTRACE_ATTACH option and I have attached in implementation as secfile_attachFork.c.
+This has to be run as root.
+But the PTRACE_ATTACH option was showing strange non-deterministic behaviour. I spent a lot of time investigating the issue and made lots of tests but could not resolve the issue.
+
+
+
+
+
+Q3)
+part 1: forbids executing /bin/nc
+NOTE: in the provided VM just doing nc runs /usr/bin/nc and not /bin/nc and that is not forbidden. To test this try running /bin/nc directly.
+part 2: the blocked IP is the one provided in the question (192.168.125.125)
+past 3: the full file path is printed if the path lies inside the /home/sekar directory. Otherwise only the filename is printed. This is because of the get_filename_from_inode function provided to us works by doing a find on a specified path and specifying the root path is inefficient so I just specify /home/sekar.
